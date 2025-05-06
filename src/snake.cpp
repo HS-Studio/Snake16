@@ -10,6 +10,9 @@ SnakeGame::SnakeGame(LGFX* display, int gridWidth, int gridHeight)
   loadLevel("/bg.csv");
   initGraphics();
   resetGame();
+
+  gridX = SCREEN_WIDTH / 2 - gridWidth * TILE_SIZE / 2;
+  gridY = SCREEN_HEIGHT / 2 - gridHeight * TILE_SIZE / 2;
 }
 
 void SnakeGame::update()
@@ -27,7 +30,7 @@ void SnakeGame::update()
   }
   head.dir = currentDir;
 
-  // Wände begrenzen
+  // Wände Easy Modus
   if (head.x < 0) head.x = gridWidth - 1;
   if (head.x >= gridWidth) head.x = 0;
   if (head.y < 0) head.y = gridHeight - 1;
@@ -40,10 +43,26 @@ void SnakeGame::update()
   }
 
   snake.push_front(head);
+
   if (checkFruitCollision()) 
   {
     shouldGrow = true;
+
+    // Merke Verdauungsteil
+    if (snake.size() >= 2)
+    {
+      digestingSegments.push_back({snake[0].x, snake[0].y, snake[0].dir});
+    }
+    
     spawnFruit();
+
+    score++;
+    if (score > highscore) highscore = score;
+  }
+
+  if (digestingSegments.front().x == snake.back().x && digestingSegments.front().y == snake.back().y)
+  {
+    digestingSegments.pop_front();
   }
 
   if (!shouldGrow) snake.pop_back();
@@ -58,9 +77,13 @@ void SnakeGame::resetGame()
   snake.push_back({5, 5, RIGHT});
   snake.push_back({5, 5, RIGHT});
   snake.push_back({5, 5, RIGHT});
+
+  digestingSegments.clear();
+
   currentDir = RIGHT;
   shouldGrow = false;
   spawnFruit();
+  score = 0;
 }
 
 void SnakeGame::drawTileToSprite(LGFX_Sprite* targetSprite, uint16_t* tile[], int index, int x, int y) {
@@ -77,6 +100,19 @@ void SnakeGame::drawBackground() {
   }
 }
 
+void SnakeGame::drawScore() {
+  scoreSprite->fillSprite(TFT_BLACK);
+  drawTileToSprite(scoreSprite, gameTiles, 0, 0, 0);
+  drawTileToSprite(scoreSprite, gameTiles, 4, 4, 0);
+  scoreSprite->setTextColor(TFT_WHITE, TFT_BLACK);
+  scoreSprite->setTextSize(2);
+  scoreSprite->setCursor(TILE_SIZE, 0);
+  scoreSprite->print(score);
+  scoreSprite->setCursor(gridX + TILE_SIZE *4, 0);
+  scoreSprite->print(highscore);
+  scoreSprite->pushSprite(gridX, gridY - TILE_SIZE, TFT_TRANSPARENT);
+}
+
 void SnakeGame::render()
 {
   drawBackground();
@@ -86,14 +122,13 @@ void SnakeGame::render()
     int tile = getTileForSegment(i);
     drawTileToSprite(snakeSprite, snakeTiles, tile, snake[i].x, snake[i].y);
   }
-  
+
   drawTileToSprite(snakeSprite, gameTiles, random(1), fruitX, fruitY);
 
   snakeSprite->pushSprite(0, 0, TFT_TRANSPARENT);
-  backgroundSprite->pushSprite(TILE_SIZE, TILE_SIZE, TFT_TRANSPARENT);
-  //snakeSprite->pushSprite(TILE_SIZE, TILE_SIZE);
+  backgroundSprite->pushSprite(gridX, gridY, TFT_TRANSPARENT);
+  drawScore();
 }
-
 
 bool SnakeGame::checkFruitCollision()
 {
@@ -132,8 +167,29 @@ int SnakeGame::getTileForSegment(int i)
   if ((fromDir == DOWN && toDir == LEFT)  || (fromDir == RIGHT && toDir == UP)) return 7;
 
   // Gerade
-  if ((fromDir == UP && toDir == DOWN) || (fromDir == DOWN && toDir == UP) || (fromDir == UP && toDir == UP) || (fromDir == DOWN && toDir == DOWN)) return 9;
-  if ((fromDir == LEFT && toDir == RIGHT) || (fromDir == RIGHT && toDir == LEFT) || (fromDir == LEFT && toDir == LEFT) || (fromDir == RIGHT && toDir == RIGHT)) return 8;
+  if ((fromDir == UP && toDir == DOWN) || (fromDir == DOWN && toDir == UP) || (fromDir == UP && toDir == UP) || (fromDir == DOWN && toDir == DOWN))
+  {
+    for (int j = 0; j < digestingSegments.size(); j++) // Verdauungsteile
+    {
+      if (digestingSegments[j].x == snake[i].x && digestingSegments[j].y == snake[i].y)
+      {
+        return 11;
+      }
+    }
+    return 9;
+  }
+
+  if ((fromDir == LEFT && toDir == RIGHT) || (fromDir == RIGHT && toDir == LEFT) || (fromDir == RIGHT && toDir == RIGHT))
+  {
+    for (int j = 0; j < digestingSegments.size(); j++)
+    {
+      if (digestingSegments[j].x == snake[i].x && digestingSegments[j].y == snake[i].y)
+      {
+        return 10;
+      }
+    }
+    return 8;
+  }
 
   // Fallback
   return 8;
@@ -191,7 +247,7 @@ void SnakeGame::loadLevel(const char* path)
 
 void SnakeGame::initGraphics()
 {
-  backgroundSprite = (LGFX_Sprite *)malloc(sizeof(LGFX_Sprite));
+  backgroundSprite = (LGFX_Sprite *)ps_malloc(sizeof(LGFX_Sprite));
   new (backgroundSprite) LGFX_Sprite(tft);
   //snakeSprite->setPsram(true);
   backgroundSprite->setColorDepth(16);
@@ -206,6 +262,14 @@ void SnakeGame::initGraphics()
   snakeSprite->createSprite(gridWidth * TILE_SIZE, gridHeight * TILE_SIZE);
   snakeSprite->fillSprite(TFT_TRANSPARENT);
   snakeSprite->setRotation(tft->getRotation());
+
+  scoreSprite = (LGFX_Sprite *)malloc(sizeof(LGFX_Sprite));
+  new (scoreSprite) LGFX_Sprite(tft);
+  //scoreSprite->setPsram(true);
+  scoreSprite->setColorDepth(16);
+  scoreSprite->createSprite(gridWidth * TILE_SIZE, TILE_SIZE);
+  scoreSprite->fillSprite(TFT_BLACK);
+  scoreSprite->setRotation(tft->getRotation());
 
   loadTileSet("/snake_tiles.raw", snakeTiles);
   loadTileSet("/game_tiles.raw", gameTiles);
