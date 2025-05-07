@@ -1,5 +1,7 @@
 # Snake-Spiel für den ESP32
 
+<img src="snake16.png" alt="snake16" width="240" height="280"/>
+
 ## Projektbeschreibung
 Dieses Projekt ist eine Implementierung des klassischen Snake-Spiels auf einem ESP32-Mikrocontroller mit einem **Adafruit ST7789 TFT-Display** und einem **Joystick** zur Steuerung. Die Bewegung der Schlange erfolgt rasterbasiert, mit anpassbarer Geschwindigkeit und Offset-Einstellungen.
 

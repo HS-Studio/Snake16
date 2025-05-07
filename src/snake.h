@@ -58,7 +58,7 @@ class SnakeGame
     int fruitX, fruitY;
 
     unsigned long lastUpdateTime;
-    unsigned long moveInterval = 300;
+    int moveInterval;
     int gridX, gridY;
     int score = 0;
     int highscore = 0;
